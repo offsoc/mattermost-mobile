@@ -1,6 +1,9 @@
 name: Detox E2E Android Tests PR
 
 on:
+    push:
+      branches:
+        - add-android-e2e-RUN
     pull_request:
       branches:
         - main
@@ -13,7 +16,7 @@ concurrency:
 
 jobs:
     build-android-apk:
-        if: github.event.label.name == 'E2E Android tests for PR'
+        # if: github.event.label.name == 'E2E Android tests for PR'
         runs-on: ubuntu-latest-8-cores
         env:
             ORG_GRADLE_PROJECT_jvmargs: -Xmx8g
@@ -78,3 +81,34 @@ jobs:
               with:
                 name: android-build-apk-${{ github.run_id }}
                 path: "android/app/build/outputs/apk/**/app-*.apk"
+
+    detox-e2e-android:
+        needs: build-android-apk
+        # if: github.event.label.name == 'E2E Android tests for PR'
+        runs-on: ubuntu-latest-8-cores
+        steps:
+            - name: ci/checkout-repo
+              uses: actions/checkout@v4
+              with:
+               ref: ${{ github.event.pull_request.head.sha }}
+
+            - name: Download APK Artifact
+              uses: actions/download-artifact@v4
+              with:
+               name: android-build-apk-${{ github.run_id }}
+               path: android/app/build/outputs/apk/
+
+            - name: Verify APK Location
+              run: |
+               ls -R android/app/build/outputs/apk/
+
+            - name: Install Detox and Dependencies
+              run: |
+                cd detox
+                npm install
+                npm install -g detox-cli
+
+            - name: Run Detox Tests
+              run: |
+                cd detox
+                npm run e2e:android -- about.e2e.ts
